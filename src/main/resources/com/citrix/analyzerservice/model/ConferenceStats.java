@@ -19,23 +19,23 @@ public class ConferenceStats {
 		this.mixer = mixer;
 	}
 
-	private LocalDateTime getTimestamp() {
+	public LocalDateTime getTimestamp() {
 		return timestamp;
 	}
 
-	private LocalDateTime getStartTime() {
+	public LocalDateTime getStartTime() {
 		return startTime;
 	}
 
-	private LocalDateTime getEndTime() {
+	public LocalDateTime getEndTime() {
 		return endTime;
 	}
 
-	private int getChannelNo() {
+	public int getChannelNo() {
 		return channelNo;
 	}
 
-	private Mixer getMixer() {
+	public Mixer getMixer() {
 		return mixer;
 	}
 	

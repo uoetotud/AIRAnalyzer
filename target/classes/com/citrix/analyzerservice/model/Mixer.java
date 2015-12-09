@@ -12,15 +12,15 @@ public class Mixer {
 		this.nSpeakers = nSpeakers;
 	}
 
-	private double[] getQuantum() {
+	public double[] getQuantum() {
 		return quantum;
 	}
 
-	private double[] getnConferenceId() {
+	public double[] getnConferenceId() {
 		return nConferenceId;
 	}
 
-	private double[] getnSpeakers() {
+	public double[] getnSpeakers() {
 		return nSpeakers;
 	}
 

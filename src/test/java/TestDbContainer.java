@@ -5,6 +5,7 @@ import java.util.List;
 import com.citrix.analyzerservice.dbconnector.DbConnectorFactory;
 import com.citrix.analyzerservice.dbconnector.IDbConnector;
 import com.citrix.analyzerservice.dbconnector.LocalDbChannel;
+import com.citrix.analyzerservice.dbconnector.LocalDbConference;
 
 public class TestDbContainer {
 
@@ -19,8 +20,18 @@ public class TestDbContainer {
 //		for (int i=0; i<confIds.size(); i++)
 //			System.out.println(confIds.get(i));
 		
-		/* Get conference folder name from confId */
-//		LocalDbChannel channel = ldc.findChannel("00000000-0000-0000-0000000000000000", "C42E0EA0-E3D3-453E-A6A6458B611B89D6_fid-7");
+		/* Get conference */
+		LocalDbConference conference = ldc.findConference("00000000-0000-0000-0000000000000000");
+		System.out.println(conference.getUuid());
+		System.out.println(conference.getStats().getTimestamp());
+		System.out.println(conference.getStats().getChannelNo());
+		System.out.println(Arrays.toString(conference.getStats().getMixer().getQuantum()));
+		System.out.println(Arrays.toString(conference.getStats().getMixer().getnConferenceId()));
+		System.out.println(Arrays.toString(conference.getStats().getMixer().getnSpeakers()));
+		
+		
+		/* Get channel */
+//		LocalDbChannel channel = ldc.findChannel("00000000-0000-0000-0000000000000000", "C42E0EA0-E3D3-453E-ABCDEFG123456789");
 //		System.out.println(channel.getUuid());
 //		System.out.println(Arrays.toString(channel.getStats().getStrProcessor().getSeqNr()));
 //		System.out.println(Arrays.toString(channel.getStats().getStrProcessor().getNS_speechPowerOut()));
@@ -32,7 +43,7 @@ public class TestDbContainer {
 //		}
 		
 		/* Get conference's channel number */
-		ldc.findConference("00000000-0000-0000-0000000000000000");
+//		ldc.findConference("00000000-0000-0000-0000000000000000");
 		
 		
 		/* Read file */		

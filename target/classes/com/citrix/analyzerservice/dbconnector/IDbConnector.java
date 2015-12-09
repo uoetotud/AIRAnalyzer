@@ -10,7 +10,11 @@ public interface IDbConnector {
 //	List<String> findProConfIds(String path);
 	List<String> findNewConfIds(String path);
 	
+	List<LocalDbConference> findConferenceList();
+	
 	LocalDbConference findConference(String confId);
+	
+	List<LocalDbChannel> findConfChannels(String confId);
 	
 	LocalDbChannel findChannel(String confId, String chanId);
 

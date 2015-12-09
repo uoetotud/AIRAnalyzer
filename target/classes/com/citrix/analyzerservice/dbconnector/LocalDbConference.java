@@ -25,23 +25,23 @@ public class LocalDbConference {
 		this(uuid, stats, null, channels);
 	}
 
-	private String getUuid() {
+	public String getUuid() {
 		return uuid;
 	}
 
-	private ConferenceStats getStats() {
+	public ConferenceStats getStats() {
 		return stats;
 	}
 
-	private ConferenceScore getScore() {
+	public ConferenceScore getScore() {
 		return score;
 	}
 
-	private Collection<LocalDbChannel> getChannels() {
+	public Collection<LocalDbChannel> getChannels() {
 		return channels;
 	}
 	
-	private void setScore(ConferenceScore score) {
+	public void setScore(ConferenceScore score) {
 		this.score = score;
 	}
 	
