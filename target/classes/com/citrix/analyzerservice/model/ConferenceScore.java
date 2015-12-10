@@ -11,12 +11,20 @@ public class ConferenceScore {
 		this.avgLevelIndicator = avgLevelIndicator;
 	}
 
-	private int getAvgPLIndicator() {
+	public int getAvgPLIndicator() {
 		return avgPLIndicator;
 	}
 
-	private int getAvgLevelIndicator() {
+	public int getAvgLevelIndicator() {
 		return avgLevelIndicator;
+	}
+
+	public void setAvgPLIndicator(int avgPLIndicator) {
+		this.avgPLIndicator = avgPLIndicator;
+	}
+
+	public void setAvgLevelIndicator(int avgLevelIndicator) {
+		this.avgLevelIndicator = avgLevelIndicator;
 	}
 	
 }

@@ -19,11 +19,20 @@ public class DtCollector {
 		return conferenceList;
 	}
 	
-	public static LocalDbConference getConference(String confId) {
+	public static LocalDbConference getConferenceSummary(String confId) {
 		DbConnectorFactory dcf = new DbConnectorFactory();
 		IDbConnector ldc = dcf.getDbContainer("LOCAL");
 		
-		LocalDbConference conference = ldc.findConference(confId);
+		LocalDbConference conference = ldc.findConference(confId, false);
+		
+		return conference;
+	}
+	
+	public static LocalDbConference getConferenceDetails(String confId) {
+		DbConnectorFactory dcf = new DbConnectorFactory();
+		IDbConnector ldc = dcf.getDbContainer("LOCAL");
+		
+		LocalDbConference conference = ldc.findConference(confId, true);
 		
 		return conference;
 	}
@@ -37,11 +46,20 @@ public class DtCollector {
 		return channelList;
 	}
 	
-	public static LocalDbChannel getChannel(String confId, String chanId) {
+	public static LocalDbChannel getChannelSummary(String confId, String chanId) {
 		DbConnectorFactory dcf = new DbConnectorFactory();
 		IDbConnector ldc = dcf.getDbContainer("LOCAL");
 		
-		LocalDbChannel channel = ldc.findChannel(confId, chanId);
+		LocalDbChannel channel = ldc.findChannel(confId, chanId, false);
+		
+		return channel;
+	}
+	
+	public static LocalDbChannel getChannelDetails(String confId, String chanId) {
+		DbConnectorFactory dcf = new DbConnectorFactory();
+		IDbConnector ldc = dcf.getDbContainer("LOCAL");
+		
+		LocalDbChannel channel = ldc.findChannel(confId, chanId, true);
 		
 		return channel;
 	}

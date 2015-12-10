@@ -7,10 +7,12 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +27,8 @@ import com.citrix.analyzerservice.model.StreamProcessor;
 
 public class LocalDbContainer implements IDbConnector {
 
-	private transient String defaultPath = "C:/Users/xil/Desktop/AIR recording example";
+	private transient String defaultPath = "C:/Users/xil/Desktop/AIR recording example/";
+	private LocalDateTime defaultTime = LocalDateTime.MIN;
 	private LocalDbConference conference;
 	private LocalDbChannel channel;
 	
@@ -37,11 +40,11 @@ public class LocalDbContainer implements IDbConnector {
 	public LocalDbContainer() {}
 	
 	@Override
-	public List<String> findNewConfIds(String path) {
+	public List<String> findNewConfIds() {
 		List<String> newConfIds = new ArrayList<String>();
 		
-		List<String> allConfIds = findAllConfIds(path);
-		List<String> proConfIds = findProConfIds(path + "/ConfList.txt");
+		List<String> allConfIds = findAllConfIds(defaultPath);
+		List<String> proConfIds = findProConfIds(defaultPath + "/ConfList.txt");
 		
 		if (allConfIds.size() == proConfIds.size())
 			return newConfIds;
@@ -62,7 +65,7 @@ public class LocalDbContainer implements IDbConnector {
 		List<LocalDbConference> conferences = new ArrayList<LocalDbConference>();
 				
 		for (int i=0; i<confIds.size(); i++) {
-			LocalDbConference conference = findConference(confIds.get(i));
+			LocalDbConference conference = findConference(confIds.get(i), false);
 			conferences.add(conference);
 		}
 		
@@ -70,57 +73,130 @@ public class LocalDbContainer implements IDbConnector {
 	}
 	
 	@Override
-	public LocalDbConference findConference(String confId) {
+	public LocalDbConference findConference(String confId, boolean showAll) {
 		
+		if (confId == null || confId.length() <= 0)
+			return null;
+		
+		List<String> folder = getNameFromId(defaultPath, confId, "folder");
+		if (folder.isEmpty())
+			return null;
+		
+		String folderPath = defaultPath + folder.get(0);
+		
+		// Get timestamp
+		LocalDateTime timestamp = convertStringToDate(folder.get(0));
+		
+		// Get startTime and endTime
+		LocalDateTime startTime = defaultTime;
+		LocalDateTime endTime = defaultTime;
+				
 		// Get conference statistics
 		ConferenceStats stats = null;
-		stats = getConferenceStats(confId);
+		
+		if (showAll)
+			stats = getConferenceStats(folderPath);
 		
 		// Get conference score
-		ConferenceScore score = null;
-		score = getConferenceScore(confId);
+		ConferenceScore score = getConferenceScore(confId);
+		if (score == null)
+			score = new ConferenceScore(0, 0);
 				
 		// Get conference channel IDs
-		List<LocalDbChannel> channels = null;
-		channels = getConferenceChannels(confId);
+		List<LocalDbChannel> channels = getConferenceChannels(folderPath);
 		
-		LocalDbConference conference = null;
-		conference = new LocalDbConference(confId, stats, score, channels);
+		LocalDbConference conference = new LocalDbConference(confId, timestamp, startTime, endTime, channels.size(), stats, score, channels);
 		
 		return conference;
 	}
 	
 	@Override
 	public List<LocalDbChannel> findConfChannels(String confId) {
-		List<LocalDbChannel> channels = null;
-		channels = getConferenceChannels(confId);
+		List<LocalDbChannel> channels = getConferenceChannels(confId);
 		
 		return channels;
 	}
 	
 	@Override
-	public LocalDbChannel findChannel(String confId, String chanId) {
-		List<String> folder = getNameFromId(defaultPath, confId, "folder");
-		if (folder.isEmpty() || folder.size() <= 0)
+	public LocalDbChannel findChannel(String confId, String chanId, boolean showAll) {
+		
+		if (confId == null || confId.length() <= 0 || chanId == null || chanId.length() <= 0)
 			return null;
 		
-		String path = defaultPath + "/" + folder.get(0);
+		List<String> folder = getNameFromId(defaultPath, confId, "folder");
+		if (folder.isEmpty())
+			return null;
+		
+		String folderPath = defaultPath + folder.get(0);
+		
+		// Get startTime and endTime
+		LocalDateTime startTime = defaultTime;
+		LocalDateTime endTime = defaultTime;
 		
 		// Get channel statistics
 		ChannelStats stats = null;
-		stats = getChannelStats(path, chanId);
+		
+		if (showAll) {
+			List<String> files = getNameFromId(folderPath, chanId, "file");
+			if (files != null && !files.isEmpty())
+				stats = findChannelStats(folderPath, files);
+		}
 		
 		// Get channel score
-		ChannelScore score = null;
-		score = getChannelScore(chanId);
+		ChannelScore score = getChannelScore(chanId);
+		if (score == null)
+			score = new ChannelScore(0, 0, 0);
 		
-		LocalDbChannel channel = new LocalDbChannel(chanId, stats, score);	
+		LocalDbChannel channel = new LocalDbChannel(chanId, startTime, endTime, stats, score);	
 		
 		return channel;
 	}
-
+	
 	@Override
-	public List<List<String>> readFile(String path, String delimiter) {
+	public ChannelStats findChannelStats(String confId, String chanId) {
+		
+		if (confId == null || confId.length() <= 0 || chanId == null || chanId.length() <= 0)
+			return null;
+		
+		List<String> folder = getNameFromId(defaultPath, confId, "folder");
+		if (folder.isEmpty())
+			return null;
+		
+		String folderPath = defaultPath + folder.get(0);		
+		List<String> files = getNameFromId(folderPath, chanId, "file");
+		if (files == null || files.isEmpty())
+			return null;
+		
+		ChannelStats stats = findChannelStats(folderPath, files);
+		
+		return stats;
+	}
+	
+	private ChannelStats findChannelStats(String folderPath, List<String> files) {
+		
+		if (files.isEmpty())
+			return null;
+		
+		ChannelStats stats = null;
+		StreamProcessor sp = null;
+		Map<String, double[]> strProData = new HashMap<String, double[]>();
+//		Map<String, double[]> strEnhData = null;
+		
+		for (int i=0; i<files.size(); i++) {
+			strProData = convertDataStructure(readFile(folderPath+"/"+files.get(i), ","));
+//			strEnhData = convertDataStructure(readFile(path, ","));
+		}
+		
+		if (strProData != null && !strProData.isEmpty())
+			sp = new StreamProcessor(strProData.get("SeqNr"), strProData.get("NS_speechPowerOut"), strProData.get("NS_noisePowerOut"));
+		StreamEnhancer se = null;
+		if (sp != null)
+			stats = new ChannelStats(sp, se);
+		
+		return stats;
+	}
+
+	private List<List<String>> readFile(String path, String delimiter) {
 		BufferedReader br = null;
 		String line = "";
 		List<List<String>> data = new ArrayList<List<String>>();		
@@ -157,10 +233,10 @@ public class LocalDbContainer implements IDbConnector {
 	}
 	
 	@Override
-	public boolean writeFile(String path, String[] content) {
+	public boolean writeFile(String[] content) {
 		
 		try {
-			File file = new File(path);
+			File file = new File(defaultPath);
 			
 			if (!file.exists())
 				file.createNewFile();
@@ -319,27 +395,21 @@ public class LocalDbContainer implements IDbConnector {
 		return dateTime;
 	}
 	
-	private ConferenceStats getConferenceStats(String confId) {
+	private ConferenceStats getConferenceStats(String folderPath) {
 		
-		if (confId == null || confId.length() <= 0)
+		if (folderPath == null || folderPath.length() <= 0)
 			return null;
 		
 		ConferenceStats stats = null;
 		Mixer m = null;
 		Map<String, double[]> mixData = null;
 		
-		List<String> folders = getNameFromId(defaultPath, confId, "folder");
-		
-		LocalDateTime dateTime = convertStringToDate(folders.get(0));
-		
-		List<String> channelIds = getConfChannelIds(defaultPath + "/" + folders.get(0));
-		
-		mixData = convertDataStructure(readFile(defaultPath + "/" + folders.get(0) + "/MixerSumStream-ActiveSpeakers_fid-2.txt", ","));
+		mixData = convertDataStructure(readFile(folderPath + "/MixerSumStream-ActiveSpeakers_fid-2.txt", ","));
 		
 		if (mixData != null && !mixData.isEmpty())
 			m = new Mixer(mixData.get("quantum"), mixData.get("nConferenceId"), mixData.get("nSpeakers"));
 		if (m != null)
-			stats = new ConferenceStats(dateTime, null, null, channelIds.size(), m);
+			stats = new ConferenceStats(m);
 		
 		return stats;
 	}
@@ -354,42 +424,33 @@ public class LocalDbContainer implements IDbConnector {
 		return score;
 	}
 	
-	private List<LocalDbChannel> getConferenceChannels(String confId) {
+	private List<LocalDbChannel> getConferenceChannels(String folderPath) {
+		
+		if (folderPath == null || folderPath.length() <= 0)
+			return null;
+		
+		// if confId instead of folderPath is passed in
+		if (folderPath.length() < 50) {
+			String confId = folderPath;
+			List<String> folder = getNameFromId(defaultPath, confId, "folder");
+			if (folder.isEmpty())
+				return null;
+			
+			folderPath = defaultPath + folder.get(0);
+		}
+		
 		List<LocalDbChannel> channels = new ArrayList<LocalDbChannel>();
-		List<String> files = getNameFromId(defaultPath, confId, "folder");
-		List<String> channelIds = getConfChannelIds(defaultPath + "/" + files.get(0));
+		List<String> channelIds = getConfChannelIds(folderPath);
+		
+		// Get startTime and endTime
+		LocalDateTime startTime = defaultTime;
+		LocalDateTime endTime = defaultTime;
 		
 		for (int i=0; i<channelIds.size(); i++) {
-			channels.add(new LocalDbChannel(channelIds.get(i), null, null));
+			channels.add(new LocalDbChannel(channelIds.get(i), startTime, endTime, null, null));
 		}
 		
 		return channels;
-	}
-	
-	private ChannelStats getChannelStats(String folderPath, String chanId) {
-		
-		if (folderPath == null || folderPath.length() <= 0 || chanId == null || chanId.length() <=0 )
-			return null;
-		
-		ChannelStats stats = null;
-		StreamProcessor sp = null;
-		Map<String, double[]> strProData = null;
-//		Map<String, double[]> strEnhData = null;
-		
-		List<String> files = getNameFromId(folderPath, chanId, "file");
-		for (int i=0; i<files.size(); i++) {
-			String filePath = folderPath + "/" + files.get(i);
-			strProData = convertDataStructure(readFile(filePath, ","));
-//			strEnhData = convertDataStructure(readFile(path, ","));
-		}
-		
-		if (strProData != null && !strProData.isEmpty())
-			sp = new StreamProcessor(strProData.get("SeqNr"), strProData.get("NS_speechPowerOut"), strProData.get("NS_noisePowerOut"));
-		StreamEnhancer se = null;
-		if (sp != null)
-			stats = new ChannelStats(null, null, sp, se);
-		
-		return stats;
 	}
 	
 	private ChannelScore getChannelScore(String chanId) {

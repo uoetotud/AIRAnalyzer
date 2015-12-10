@@ -1,7 +1,11 @@
 package com.citrix.analyzerservice.wshandler;
 
+import java.lang.reflect.Type;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
 
@@ -20,6 +24,10 @@ import com.citrix.analyzerservice.dbconnector.TestStructure;
 import com.citrix.analyzerservice.dtcollector.DtCollector;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParseException;
 
 @Path("/QueryAPI")
 public class WsHandler {
@@ -44,6 +52,13 @@ public class WsHandler {
 		List<LocalDbConference> conferenceList = DtCollector.getConferenceList();
 				
 		Gson gson = new GsonBuilder().setPrettyPrinting().create();
+//		Gson gson = new GsonBuilder().registerTypeAdapter(LocalDateTime.class, new JsonDeserializer<LocalDateTime>() {
+//		    @Override
+//		    public LocalDateTime deserialize(JsonElement json, Type type, JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
+//		        Instant instant = Instant.ofEpochMilli(json.getAsJsonPrimitive().getAsLong());
+//		        return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+//		    }
+//		}).create();
 		
 		return gson.toJson(conferenceList);
 	}
@@ -51,8 +66,19 @@ public class WsHandler {
 	@GET
 	@Path("/Conferences/{confId}")
 	@Produces(MediaType.APPLICATION_JSON)
-	public String getConference(@PathParam("confId") String confId) {
-		LocalDbConference container = DtCollector.getConference(confId);
+	public String getConferenceSummary(@PathParam("confId") String confId) {
+		LocalDbConference container = DtCollector.getConferenceSummary(confId);
+				
+		Gson gson = new GsonBuilder().setPrettyPrinting().create();
+		
+		return gson.toJson(container);
+	}
+	
+	@GET
+	@Path("/Conferences/{confId}/Details")
+	@Produces(MediaType.APPLICATION_JSON)
+	public String getConferenceDetails(@PathParam("confId") String confId) {
+		LocalDbConference container = DtCollector.getConferenceDetails(confId);
 				
 		Gson gson = new GsonBuilder().setPrettyPrinting().create();
 		
@@ -73,11 +99,22 @@ public class WsHandler {
 	@GET
 	@Path("/Channels/{chanId}")
 	@Produces(MediaType.APPLICATION_JSON)
-	public String getChannel(@PathParam("chanId") String chanId) {
-		LocalDbChannel container = DtCollector.getChannel("00000000-0000-0000-0000000000000000", chanId);
+	public String getChannelSummary(@PathParam("chanId") String chanId) {
+		LocalDbChannel channel = DtCollector.getChannelSummary("00000000-0000-0000-0000000000000000", chanId);
 				
 		Gson gson = new GsonBuilder().setPrettyPrinting().create();
 		
-		return gson.toJson(container);
+		return gson.toJson(channel);
+	}
+	
+	@GET
+	@Path("/Channels/{chanId}/Details")
+	@Produces(MediaType.APPLICATION_JSON)
+	public String getChannelDetails(@PathParam("chanId") String chanId) {
+		LocalDbChannel channel = DtCollector.getChannelDetails("00000000-0000-0000-0000000000000000", chanId);
+				
+		Gson gson = new GsonBuilder().setPrettyPrinting().create();
+		
+		return gson.toJson(channel);
 	}
 }
