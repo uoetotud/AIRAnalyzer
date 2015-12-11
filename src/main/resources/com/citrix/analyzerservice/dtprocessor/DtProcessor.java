@@ -2,7 +2,9 @@ package com.citrix.analyzerservice.dtprocessor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.citrix.analyzerservice.dbconnector.DbConnectorFactory;
 import com.citrix.analyzerservice.dbconnector.IDbConnector;
@@ -10,6 +12,7 @@ import com.citrix.analyzerservice.dbconnector.LocalDbChannel;
 import com.citrix.analyzerservice.model.ChannelScore;
 import com.citrix.analyzerservice.model.ChannelStats;
 import com.citrix.analyzerservice.model.ConferenceScore;
+import com.citrix.analyzerservice.model.ScoreWrapper;
 
 public class DtProcessor implements IDtProcessor {
 	
@@ -32,52 +35,91 @@ public class DtProcessor implements IDtProcessor {
 	}
 	
 	@Override
-	public void calculateScore(List<String> confIds) {
-//		for (String confId : confIds) {
-//			ConferenceScore confScore = calConferenceScore(confId);
-//		}
+	public boolean updateConfList(List<String> confIds, List<ConferenceScore> confScores) {
+		
+		if (confIds.size() != confScores.size())
+			return false;
+		
+		int size = confIds.size();
+		String[] conferenceItems = new String[size];
+		
+		for (int i=0; i<size; i++) {
+			String confId = confIds.get(i);
+			conferenceItems[i] = confId + ", " + ldc.findConferenceTimestamp(confId) + ", " + ldc.findConfChannels(confId).size() + ", " +
+					Integer.toString(confScores.get(i).getAvgPLIndicator()) + ", " + Integer.toString(confScores.get(i).getAvgLevelIndicator());
+		}
+		
+		if (ldc.writeFile("conference", conferenceItems))
+			return true;
+		else
+			return false;
 	}
 	
 	@Override
-	public boolean updateList() {
-		return true;		
+	public boolean updateChanList(String confId, List<ChannelScore> chanScores) {
+		
+		List<LocalDbChannel> channels = ldc.findConfChannels(confId);
+		if (channels == null || channels.isEmpty())
+			return false;
+		
+		if (channels.size() != chanScores.size())
+			return false;
+		
+		int size = channels.size();
+		String[] channelItems = new String[size];
+		
+		for (int i=0; i<size; i++) {
+			channelItems[i] = confId + ", " + channels.get(i).getUuid() + ", " + Integer.toString(chanScores.get(i).getAvgPLIndicator()) + ", " +
+					Integer.toString(chanScores.get(i).getAvgLevelIndicator()) + ", " + Double.toString(chanScores.get(i).getAvgPacketLoss());
+		}
+		
+		if (ldc.writeFile("channel", channelItems))
+			return true;
+		else
+			return false;
 	}
 	
-	private ConferenceScore calConferenceScore(String confId) {
+	@Override
+	public ConferenceScore calConferenceScore(String confId, List<ChannelScore> chanScores) {
 		
 		List<LocalDbChannel> channels = ldc.findConfChannels(confId);
 		if (channels == null || channels.isEmpty())
 			return null;
 		
+		if (channels.size() != chanScores.size())
+			return null;
+		
 		ConferenceScore score = new ConferenceScore(0, 0);
 		
-		for (LocalDbChannel channel : channels) {			
-			ChannelScore chanScore = calChannelScore(confId, channel.getUuid());
+		for (int i=0; i<channels.size(); i++) {			
+			ChannelScore chanScore = chanScores.get(i);
 			
 			if (chanScore.getAvgLevelIndicator() > score.getAvgLevelIndicator())
 				score.setAvgLevelIndicator(chanScore.getAvgLevelIndicator());
 			
 			if (chanScore.getAvgPLIndicator() > score.getAvgPLIndicator())
-				score.setAvgPLIndicator(chanScore.getAvgPLIndicator());
-		}		
+				score.setAvgPLIndicator(chanScore.getAvgPLIndicator());			
+		}
 		
 		return score;
 	}
 	
-	private ChannelScore calChannelScore(String confId, String chanId) {
+	@Override
+	public ChannelScore calChannelScore(String confId, String chanId) {
 		
 		int i = 0, j = 0, size = 0, counter = 0;
-		
-		DbConnectorFactory dcf = new DbConnectorFactory();
-		IDbConnector ldc = dcf.getDbContainer("LOCAL");
 		
 		ChannelStats stats = ldc.findChannelStats(confId, chanId);
 		if (stats == null)
 			return null;
 		
-		double[] seqNr = Arrays.copyOf(stats.getStrProcessor().getSeqNr(), kMaxStatsValues);
-		double[] speechValues = Arrays.copyOf(stats.getStrProcessor().getNS_speechPowerOut(), kMaxStatsValues);
-		double[] noiseValues = Arrays.copyOf(stats.getStrProcessor().getNS_noisePowerOut(), kMaxStatsValues);
+		double[] seqNr = stats.getStrProcessor().getSeqNr();
+		double[] speechValues = stats.getStrProcessor().getNS_speechPowerOut();
+		double[] noiseValues = stats.getStrProcessor().getNS_noisePowerOut();
+		
+//		double[] seqNr = Arrays.copyOf(stats.getStrProcessor().getSeqNr(), kMaxStatsValues);
+//		double[] speechValues = Arrays.copyOf(stats.getStrProcessor().getNS_speechPowerOut(), kMaxStatsValues);
+//		double[] noiseValues = Arrays.copyOf(stats.getStrProcessor().getNS_noisePowerOut(), kMaxStatsValues);
 		
 		size = speechValues.length;
 		

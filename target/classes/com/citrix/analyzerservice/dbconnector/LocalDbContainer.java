@@ -29,14 +29,7 @@ public class LocalDbContainer implements IDbConnector {
 
 	private transient String defaultPath = "C:/Users/xil/Desktop/AIR recording example/";
 	private LocalDateTime defaultTime = LocalDateTime.MIN;
-	private LocalDbConference conference;
-	private LocalDbChannel channel;
-	
-	public LocalDbContainer(LocalDbConference conference, LocalDbChannel channel) {
-		this.conference = conference;
-		this.channel = channel;
-	}
-	
+		
 	public LocalDbContainer() {}
 	
 	@Override
@@ -85,7 +78,7 @@ public class LocalDbContainer implements IDbConnector {
 		String folderPath = defaultPath + folder.get(0);
 		
 		// Get timestamp
-		LocalDateTime timestamp = convertStringToDate(folder.get(0));
+		LocalDateTime timestamp = findConferenceTimestamp(folder.get(0));
 		
 		// Get startTime and endTime
 		LocalDateTime startTime = defaultTime;
@@ -103,7 +96,7 @@ public class LocalDbContainer implements IDbConnector {
 			score = new ConferenceScore(0, 0);
 				
 		// Get conference channel IDs
-		List<LocalDbChannel> channels = getConferenceChannels(folderPath);
+		List<LocalDbChannel> channels = findConfChannels(folderPath);
 		
 		LocalDbConference conference = new LocalDbConference(confId, timestamp, startTime, endTime, channels.size(), stats, score, channels);
 		
@@ -111,8 +104,30 @@ public class LocalDbContainer implements IDbConnector {
 	}
 	
 	@Override
-	public List<LocalDbChannel> findConfChannels(String confId) {
-		List<LocalDbChannel> channels = getConferenceChannels(confId);
+	public List<LocalDbChannel> findConfChannels(String folderPath) {
+		if (folderPath == null || folderPath.length() <= 0)
+			return null;
+		
+		// if confId instead of folderPath is passed in
+		if (folderPath.length() < 50) {
+			String confId = folderPath;
+			List<String> folder = getNameFromId(defaultPath, confId, "folder");
+			if (folder.isEmpty())
+				return null;
+			
+			folderPath = defaultPath + folder.get(0);
+		}
+		
+		List<LocalDbChannel> channels = new ArrayList<LocalDbChannel>();
+		List<String> channelIds = getConfChannelIds(folderPath);
+		
+		// Get startTime and endTime
+		LocalDateTime startTime = defaultTime;
+		LocalDateTime endTime = defaultTime;
+		
+		for (int i=0; i<channelIds.size(); i++) {
+			channels.add(new LocalDbChannel(channelIds.get(i), startTime, endTime, null, null));
+		}
 		
 		return channels;
 	}
@@ -233,20 +248,39 @@ public class LocalDbContainer implements IDbConnector {
 	}
 	
 	@Override
-	public boolean writeFile(String[] content) {
+	public boolean writeFile(String type, String[] content) {
 		
 		try {
-			File file = new File(defaultPath);
+			String fileName = type.equalsIgnoreCase("conference") ? "ConfList.txt" : "ChanList.txt";
+			File file = new File(defaultPath + fileName);
+			boolean newlyCreated = false;
 			
-			if (!file.exists())
+			if (!file.exists()) {
 				file.createNewFile();
+				newlyCreated = true;
+			}
 			
 			BufferedWriter bw = new BufferedWriter(new FileWriter(file.getAbsoluteFile(), true));
+			
+			if (newlyCreated) {
+				if (type.equalsIgnoreCase("conference")) {
+					bw.write("[uuid], [timestamp], [channelNo], [avgPLIndicator], [avgLevelIndicator]");
+					bw.newLine();
+				} else if (type.equalsIgnoreCase("channel")) {
+					bw.write("[confId], [uuid], [avgPLIndicator], [avgLevelIndicator], [avgPacketLoss]");
+					bw.newLine();
+				} else {
+					return false;
+				}
+			}
+			
 			for (int i=0; i<content.length; i++) {
 				bw.write(content[i]);
 				bw.newLine();
 			}
 			bw.close();
+			
+			return true;
 			
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -284,7 +318,7 @@ public class LocalDbContainer implements IDbConnector {
 			
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+//			e.printStackTrace();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -345,6 +379,9 @@ public class LocalDbContainer implements IDbConnector {
 			if (type.equalsIgnoreCase("file"))
 				if (fileLists[i].isFile() && fileLists[i].getName().contains(uuid) && fileLists[i].getName().endsWith(".txt"))
 					files.add(fileLists[i].getName());
+			if (type.equalsIgnoreCase("mixer"))
+				if (fileLists[i].isFile() && fileLists[i].getName().contains("MixerSumStream") && fileLists[i].getName().endsWith(".txt"))
+					files.add(fileLists[i].getName()); 
 		}
 		
 		return files;
@@ -387,8 +424,20 @@ public class LocalDbContainer implements IDbConnector {
 		return channels;
 	}
 	
-	private LocalDateTime convertStringToDate(String s) {
-		String dateTimeStr = "20" + s.substring(0, 13);
+	@Override
+	public LocalDateTime findConferenceTimestamp(String folder) {
+		
+		// if confId instead of folderPath is passed in
+		if (folder.length() < 50) {
+			String confId = folder;
+			List<String> folders = getNameFromId(defaultPath, confId, "folder");
+			if (folder.isEmpty())
+				return null;
+			
+			folder = folders.get(0);
+		}
+		
+		String dateTimeStr = "20" + folder.substring(0, 13);
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 		LocalDateTime dateTime = LocalDateTime.parse(dateTimeStr, formatter);
 		
@@ -404,7 +453,7 @@ public class LocalDbContainer implements IDbConnector {
 		Mixer m = null;
 		Map<String, double[]> mixData = null;
 		
-		mixData = convertDataStructure(readFile(folderPath + "/MixerSumStream-ActiveSpeakers_fid-2.txt", ","));
+		mixData = convertDataStructure(readFile(folderPath + getNameFromId(folderPath, "", "mixer"), ","));
 		
 		if (mixData != null && !mixData.isEmpty())
 			m = new Mixer(mixData.get("quantum"), mixData.get("nConferenceId"), mixData.get("nSpeakers"));
@@ -424,34 +473,34 @@ public class LocalDbContainer implements IDbConnector {
 		return score;
 	}
 	
-	private List<LocalDbChannel> getConferenceChannels(String folderPath) {
-		
-		if (folderPath == null || folderPath.length() <= 0)
-			return null;
-		
-		// if confId instead of folderPath is passed in
-		if (folderPath.length() < 50) {
-			String confId = folderPath;
-			List<String> folder = getNameFromId(defaultPath, confId, "folder");
-			if (folder.isEmpty())
-				return null;
-			
-			folderPath = defaultPath + folder.get(0);
-		}
-		
-		List<LocalDbChannel> channels = new ArrayList<LocalDbChannel>();
-		List<String> channelIds = getConfChannelIds(folderPath);
-		
-		// Get startTime and endTime
-		LocalDateTime startTime = defaultTime;
-		LocalDateTime endTime = defaultTime;
-		
-		for (int i=0; i<channelIds.size(); i++) {
-			channels.add(new LocalDbChannel(channelIds.get(i), startTime, endTime, null, null));
-		}
-		
-		return channels;
-	}
+//	private List<LocalDbChannel> getConferenceChannels(String folderPath) {
+//		
+//		if (folderPath == null || folderPath.length() <= 0)
+//			return null;
+//		
+//		// if confId instead of folderPath is passed in
+//		if (folderPath.length() < 50) {
+//			String confId = folderPath;
+//			List<String> folder = getNameFromId(defaultPath, confId, "folder");
+//			if (folder.isEmpty())
+//				return null;
+//			
+//			folderPath = defaultPath + folder.get(0);
+//		}
+//		
+//		List<LocalDbChannel> channels = new ArrayList<LocalDbChannel>();
+//		List<String> channelIds = getConfChannelIds(folderPath);
+//		
+//		// Get startTime and endTime
+//		LocalDateTime startTime = defaultTime;
+//		LocalDateTime endTime = defaultTime;
+//		
+//		for (int i=0; i<channelIds.size(); i++) {
+//			channels.add(new LocalDbChannel(channelIds.get(i), startTime, endTime, null, null));
+//		}
+//		
+//		return channels;
+//	}
 	
 	private ChannelScore getChannelScore(String chanId) {
 		ChannelScore score = null;

@@ -11,7 +11,7 @@ public class DbContainer {
 	IDbConnector ldc = dcf.getDbContainer("LOCAL");
 	
 	public void getNewConfIds() {
-		List<String> confIds = ldc.findNewConfIds("C:/Users/xil/Desktop/AIR recording example");
+		List<String> confIds = ldc.findNewConfIds();
 		
 		for (int i=0; i<confIds.size(); i++)
 			System.out.println(confIds.get(i));
